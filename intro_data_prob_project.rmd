@@ -1,0 +1,462 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    fig_width: 10
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+BRFSS did use randomization by using "Random Digit Dialing" (Centers for Disease Control and Prevention[CDC], n.d.), which called both random cell phones and landlines. Thus, the results can be generalized to the following population: **non-institutionalized, adults (18 years and older) residing in the U.S. with access to a landline or cell phone**.
+
+I have reservations about the survey under representing Black and Latino men because of the “non-institutionalized” population. “Black men are six times as likely to be incarcerated as white men, and Hispanic men are more than twice as likely to be incarcerated as non-Hispanic white men”. (The Sentencing Project, n.d.). Other institutionalized populations include adults who live in long-term group housing. The population of individuals without access to a landline or cell phone cannot be included in the generalization. These may include homeless adult populations in the U.S or homes without the means to pay for a landline or cell phone.
+
+While the BRFSS did use randomization by using "Random Digit Dialing" (Centers for Disease Control and Prevention[CDC], n.d.), the data was collected as a retrospective observational study, thus it establishes correlation, but **not** causation.
+
+                                  References
+Centers for Disease Control and Prevention. (n.d.). BRFSS Frequently Asked Questions (FAQs). https://www.cdc.gov/brfss/about/brfss_faq.htm
+
+The Sentencing Project. (n.d.) Criminal Justice Facts. https://www.sentencingproject.org/criminal-justice-facts/ 
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+
+Do non-institutionalized adults age 18 - 64 residing in the US with access to a cell phone or landline who have some college or technical school education **and** are currently married have a higher rate of having health care coverage? Use only completed interviews.
+
+**Research quesion 2:**
+
+Do non-institutionalized adults residing in the US with access to a cell phone or landline have a higher rate of having had a flu shot in the last 12 months if they have had some college or technical school education? Use only completed interviews.
+
+**Research quesion 3:**
+
+Are non-institutionalized adults residing in the US with access to a cell phone or landline have a lower rate of exercising in the last 30 days if they have reported binge drinking in the last 30 days? Does the rate of answering "Yes" to exercise in the last 30 days decreases as the number of binge drinking episodes increases.
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Research quesion 1:**
+
+Do non-institutionalized adults between ages 18 and 64 residing in the US with access to a cell phone or landline who have some college or techical school education **and** are currently married have higher rate of having health care coverage than all adults between ages 18 and 64 in the general population. Use only completed interviews.
+
+Variables/factors I will use are:
+<ul>
+<li>_age65yr: Reported Age In Two Age Groups Calculated Variable
+  <ul>
+  <li>For this question I am only using the group in "Age 18 to 64 [age between 18 and 64]"</li>
+  <li>Need to remove/ignore"Age 65 or older [age 65 and over]" and "NA"'s</li>
+  </ul>
+</li>
+<li>_hcvu651 = Respondents Aged 18-64 With Health Care Coverage
+  <ul>
+  <li>Test group "Have health care coverage [age between 18 and 64, and hlthplan = 1]"</li>
+  <li>Comparison group also includes "Do not have health care coverage [age between 18 and 64, and hlthplan = 2]"</li>
+  <li>Need to remove "NA"'s</li>
+  </ul>
+</li>
+<li>_educag = Computed Level Of Education Completed Categories
+  <ul>
+  <li>Test group includes: "Attended College or Technical School [educa coded 5]" and "Graduated from College or Technical School [educa coded 6]"</li>
+  <li>Comparison group also includes "Did not graduate High School [educa coded 1, 2, or 3]" and "Graduated High School [educa coded 4]"</li>
+  <li>Need to remove/ignore "NA"'s</li>
+  </ul>
+</li>
+<li>marital = Marital Status
+  <ul>
+  <li>Test group includes "Married"</li>
+  <li>Comparison group also includes "Divorced", "Widowed", "Separated", "Never Married" and "A member of an unmarried couple"</li>
+  <li>Need to remove/ignore "NA"'s</li>
+  </ul>
+</li>
+<li>dispcode: Final Disposition
+  <ul>
+    <li>For this question I am only using "Completed Interview"</li>
+  </ul>
+</li>
+</ul>
+
+
+**Step One: Limit data frame to Completed Interviews and Adults in the 18 - 64 age range**
+
+```{r}
+## confirm names of columns as some columns started with "_"
+names(brfss2013)
+
+```
+
+**Notice** that all columns that started with "_" now start with "X_".
+
+Create a data frame **df_q1_control** that only includes X_age65y between 18 and 64, and dispcode Completed Interview
+
+```{r}
+df_q1_control <- brfss2013 %>% 
+  filter(dispcode == "Completed interview" & X_age65yr == "Age 18 to 64")
+```
+
+Confirm I have only one group of completed interviews for adults between 18 and 64 years old
+
+```{r}
+df_q1_control %>%
+  group_by(dispcode, X_age65yr) %>%
+  summarise(count = n())
+```
+
+I have 283,846 observations to work with. But I still need to remove NA's from X_hcvu651 (has health care coverage question)
+```{r}
+df_q1_control <- df_q1_control %>%
+  filter(!(is.na(X_hcvu651)))
+```
+
+**Step Two: Use group by to group df_1_control into who has health insurance**
+
+```{r}
+df_q1_control %>%
+  group_by(X_hcvu651) %>%
+  summarise(count = n())
+```
+
+Determine rate of health care coverage for adults in the population ages 18 - 64
+
+```{r}
+control_has_healthcare_rate = df_q1_control %>%
+  summarise(control_has_heathcare_rate = sum(X_hcvu651 == "Have health care coverage") / n()) %>%
+  arrange(desc(control_has_heathcare_rate))
+
+control_has_healthcare_rate
+```
+
+**Step Three: Work with the part of the data set that is married and has some college education.**
+
+First, I want to see, in a plot, the df_q1_control groups parts that have various degrees of education, and are in various marital state
+
+```{r}
+ggplot(data = df_q1_control, aes(x = marital, fill = X_educag)) +
+  geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+We can see that the majority of people who have been married have attended or graduated some college or technical school.
+
+What if we look at the distribution of marriage across college graduation using a segmented bar plot.
+```{r}
+ggplot(data = df_q1_control, aes(x = X_educag, fill = marital)) +
+  geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+I notice that I have a small group of NA's in both the education and martial status factors. I need to remove those before I can do further analysis
+
+```{r}
+df_q1_control <- df_q1_control %>%
+  filter(!(is.na(marital)))
+         
+df_q1_control <- df_q1_control %>%
+  filter(!(is.na(X_educag)))
+```
+
+Check my counts in marital and X_educag to ensure I have removed the NA's
+```{r}
+df_q1_control %>%
+  group_by(marital, X_educag) %>%
+  summarise(count = n())
+```
+
+The NA's have been removed.
+
+**Step Four: Find out the rate of health coverage for the people who are both currently married and have some college education. I want to create a new data frame of only people in this group.**
+
+```{r}
+df_q1_test <- df_q1_control %>%
+  filter(marital == "Married", X_educag != 'Did not graduate high school', X_educag != 'Graduated high school')
+
+df_q1_test %>%
+  group_by(marital, X_educag) %>%
+  summarise(count = n())
+```
+
+From the data frame df_q1_test determine the rate of health coverage
+```{r}
+test_has_healthcare_rate <- df_q1_test %>%
+  summarise(test_has_healthcare_rate = sum(X_hcvu651 == "Have health care coverage") / n())
+```
+
+Is the rate of the test group higher than the control group?
+
+```{r}
+test_has_healthcare_rate
+```
+
+```{r}
+is_test_rate_higher <- test_has_healthcare_rate > control_has_healthcare_rate
+
+is_test_rate_higher
+```
+
+By how many percentage points is the rate higher?
+```{r}
+perc_higher <- (test_has_healthcare_rate - control_has_healthcare_rate) * 100
+
+print("Percent Higher: ", str(perc_higher))
+```
+
+<h3>Question 1 Conclusion</h3>
+**Yes**, the rate of health coverage in adults age 18 - 64 is higher in married adults with some college or technical school education. It is higher by ~9 percentage points than in the general population.
+
+I did not address whether this difference is statisically significant.
+
+**Research quesion 2:**
+
+Do non-institutionalized adults residing in the US with access to a cell phone or landline have a higher rate of having had a flu shot in the last 12 months if they have had some college or technical school education? Use only completed interviews.
+
+Variables/factors I will use are:
+<li>_educag = Computed Level Of Education Completed Categories
+  <ul>
+  <li>Test group includes: "Attended College or Technical School [educa coded 5]" and "Graduated from College or Technical School [educa coded 6]"</li>
+  <li>Comparison group also includes "Did not graduate High School [educa coded 1, 2, or 3]" and "Graduated High School [educa coded 4]"</li>
+  <li>Need to remove/ignore "NA"'s</li>
+  </ul>
+</li>
+<li>flushot6 = Adult Flu Shot/Spray Past 12 Mos
+  <ul>
+  <li>Need to limit are EDA to only "Yes" vs. "No" answers</li>
+  <li>Need to remove/ignore  "Don't Know", "Refused", "Missing", in other words, all values that would be NA"'s</li>
+  </ul>
+</li>
+<li>dispcode: Final Disposition
+  <ul>
+    <li>For this question I am only using "Completed Interview"</li>
+  </ul>
+</li>
+</ul>
+
+**Step One: Fiter the complete result set by completed interviews and only interviews that either had a Yes or No response to having had a flue shot**
+
+Filter by Completed, Yes or No on flushot question and also filter out the NA's in the flushot question. I also want to remove NA's from the education factor because I will not include those observations in my test group
+
+```{r}
+df_q2_control <- brfss2013 %>% 
+  filter(dispcode == "Completed interview" & (flushot6 == "Yes" || flushot6 == "No") & !(is.na(flushot6)) & !(is.na(X_educag)))
+
+df_q2_control %>%
+  group_by(flushot6) %>%
+  summarise(count = n())
+```
+
+Return rate of "Yes" flushot. This will be our comparison.
+
+```{r}
+control_has_flushot <- df_q2_control %>%
+  summarise(control_has_flushot = sum(flushot6 == "Yes") / n())
+
+control_has_flushot
+```
+
+I would like to visualize the control group's Yes and No answers for whether they have had a flu shot in the last 12 months.
+
+```{r}
+ggplot(data = df_q2_control, aes(x = flushot6)) +
+  geom_bar(aes(fill=flushot6)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+I find it shocking that only 46% of non-incarcerated adults residing in the US with access to a cell phone or landline have received a flu shot in the last 12 months (in 2013). But, that is what the survey tells us.
+
+**Step Two: Determine if some college or technical school have a higher rate of having had the flu shot in the last 12 months.**
+
+Let's visualize the flu shot counts for the educational status.
+
+```{r}
+ggplot(data = df_q2_control, aes(x = flushot6, fill = X_educag)) +
+  geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+I want to examine the "Yes" flushot rate within the Attended or Graduated College or Technical School group. I will create another data frame that only includes the Attended or Graduated College or Technical School cohort
+
+```{r}
+df_q2_test <- df_q2_control %>% 
+  filter(X_educag != 'Did not graduate high school', X_educag != 'Graduated high school')
+
+df_q2_test %>%
+  group_by(flushot6) %>%
+  summarise(count = n())
+
+```
+
+I will determine the rate of "Yes" flushot within this group
+
+```{r}
+test_has_flushot <- df_q2_test %>%
+  summarise(test_has_flushot = sum(flushot6 == "Yes") / n())
+
+test_has_flushot
+```
+
+Is this rate higher than in the control group
+
+```{r}
+is_test_flushot_rate_higher <- test_has_flushot > control_has_flushot
+
+is_test_flushot_rate_higher
+```
+
+By how many percentage points is the test rate higher?
+
+```{r}
+rate_flushot_higher = (test_has_flushot - control_has_flushot) * 100
+
+rate_flushot_higher
+```
+
+The rate is slightly higher: by ~2 percentage points. I did not calculate if this is statistically significant.
+
+<h3>Question 2 Conclusion</h3>
+**Yes**, the rate of flu shots in adults age 18 - 64 is higher in those with some college or technical school education. It is higher by ~2 percentage points than in the general population.
+
+I did not address whether this difference is statisically significant.
+
+**Research quesion 3:**
+
+Are non-institutionalized adults residing in the US with access to a cell phone or landline have a lower rate of exercising in the last 30 days if they have reported binge drinking in the last 30 days than the general population? Does the rate of answering "Yes" to exercise in the last 30 days decreases as the number of binge drinking episodes increases.
+
+Variables/factors I will use are:
+<li>exerany2: Exercise In Past 30 Days
+  <ul>
+  <li>Test group includes: "Yes"</li>
+  <li>Comparison group also includes "No"</li>
+  <li>Need to remove/ignore "NA"'s which include "Don't Know", "Refused" and "Missing" </li>
+  </ul>
+</li>
+<li>X_rfbing5: Binge Drinking Calculated Variable
+  <ul>
+  <li>We are looking at the "Yes" answers compared to all "Yes" or "No" answers.</li>
+  <li>Need to remove/ignore  "Don’t know", "Refused", and "Missing ", in other words, all values that would be NA"'s</li>
+  </ul>
+</li>
+<li>drnk3ge5:Binge Drinking - "Considering all types of alcoholic beverages, how many times during the past 30 days did you have 5 or more drinks for men or 4 or more drinks for women on an occasion?"
+  <ul>
+  <li>Number of drinks: values between 1 - 76</li>
+  <li>0 = did not binge drink</li>
+  <li>Need to remove/ignore  "None", "Refused", and "Missing ", in other words, all values that would be NA"'s</li>
+  </ul>
+</li>
+<li>dispcode: Final Disposition
+  <ul>
+    <li>For this question I am only using "Completed Interview"</li>
+  </ul>
+</li>
+</ul>
+
+**Step One: Fiter the complete result set by completed interviews and only interviews that either had a Yes or No response to X_rfbing5**
+
+Filter by Completed, Yes or No on flushot question and also filter out the NA's in the binge drinking variables/factors. 
+
+```{r}
+df_q3_control <- brfss2013 %>% 
+  filter(dispcode == "Completed interview" & (X_rfbing5 == "Yes" || X_rfbing5 == "No") & !(is.na(X_rfbing5)) & !(is.na(drnk3ge5)))
+
+df_q3_control %>%
+  group_by(X_rfbing5) %>%
+  summarise(count = n())
+```
+ 
+ I want to explore who exercised in last 30 days within df_q3_control. First I will visualize with a stacked bar chart
+ 
+```{r}
+ggplot(data = df_q3_control, aes(x = X_rfbing5, fill = exerany2)) +
+  geom_bar()
+```
+ 
+It looks like there are a few NA's in the exerany2 variable. I will filter those from the data frame.
+
+```{r}
+df_q3_control <- brfss2013 %>% 
+  filter(!(is.na(exerany2)))
+
+# confirm by looking at counts
+df_q3_control %>%
+  group_by(exerany2) %>%
+  summarise(count = n())
+
+```
+ The NA's have all been removed from the variables I am investigating.
+ 
+ I will determine the rate of exercise within the last 30 days in the df_q3_control group, and then also within the group that reported binge drinking in the last 30 days.
+ 
+```{r}
+control_exercise_30days <- df_q3_control %>%
+  summarise(control_exercise_30days = sum(exerany2 == "Yes") / n())
+
+paste("Control rate of any exercise in last 30 days: ", control_exercise_30days)
+
+df_q3_test1 <- df_q3_control %>%
+  filter(X_rfbing5 == "Yes")
+
+test1_exercise_30days <- df_q3_test1 %>%
+  summarise(test1_exercise_30days = sum(exerany2 == "Yes") / n())
+
+paste("Test 1 rate of any exercise in last 30 days: ", test1_exercise_30days)
+```
+ 
+This is **surprising**, there is a higher rate of exercise in the last 30 days for people who report binge drinking in the last 30 days.
+
+Let's use visualization to determine if the rate of answering "Yes" to exercise in the last 30 days decreases as the number of binge drinking episodes increases.
+
+First, I will bin the number of binge drinking episodes: drnk3ge5
+I want to know the min and max for drnk3ge5
+```{r}
+df_q3_test1 %>%
+  summarise(max_bingedrinking = max(drnk3ge5), min_bingedrinking = min(drnk3ge5))
+```
+
+I am going to bin df_qe3_test1 into bins of size 4. The first bin will contain those who reported 1 - 4 episodes of binge drinking. Below is a histogram with frequency observations in the bins. It is clear that most of the observations that did report binge drinking in the last 30 days report between1 and 8 episodes of binge drinking.
+
+```{r}
+ggplot(data = df_q3_test1, aes(x = drnk3ge5)) +
+  geom_histogram(binwidth = 4)
+```
+
+Let's also determine the mean and sd
+
+```{r}
+df_q3_test1 %>%
+  summarise(mean_bd = mean(drnk3ge5), sd_bd = sd(drnk3ge5), n = n())
+```
+
+Now I want to see the relation of "Yes" and "No" exercise 
+
+```{r}
+ggplot(data = df_q3_test1, aes(x = drnk3ge5, fill = exerany2)) +
+  geom_histogram(binwidth = 4)
+```
+
+<h3>Question 3 Conclusion</h3>
+Well, this too is **surprising** within our binge drinking cohort it appears that at almost all level of binge drinking the subject is approx. the same or more likely to have exercised in the last 30 days.
+
+So, **NO**, rate of exercise in the last 30 days does not decrease if someone reports binge drinking, and it also does not decrease with frequency of bringe drinking.
